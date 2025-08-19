@@ -1,982 +1,253 @@
 # web-give-away-money
 
-<!DOCTYPE html>
-<html>
+function doGet(e) {
+  var x = HtmlService.createTemplateFromFile("login");
+  var y = x.evaluate();
+  var z = y.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  return z;
+}
 
-<head>
-  <base target="_top">
-  <script>
-    // ฟังก์ชันตรวจสอบอีเมล
-    function validateEmail(email) {               
-      var emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-      return emailPattern.test(email);
-    }
-    // ฟังก์ชันเพิ่มผู้ใช้ใหม่
-    function AddRow() {
-    var usernamee = document.getElementById("usernamee").value;
-    var passwordd = document.getElementById("passwordd").value;
-    var title = document.getElementById("title").value;
-    var firstname = document.getElementById("firstname").value;
-    var lastname = document.getElementById("lastname").value;
-    var age = document.getElementById("age").value;
-    var job = document.getElementById("job").value;
-    var income = document.getElementById("income").value;
-    var address = document.getElementById("address").value;
-    var phone = document.getElementById("phone").value;
+// ฟังก์ชันเช็คการเข้าสู่ระบบ
+function checkLogin(username, password) {
+  var url = 'https://docs.google.com/spreadsheets/d/1q3a4NVGX-EWTHmxUT-gi9Seyk6AwDJmDkw2jad1xFrY/edit?gid=0#gid=0';
+  var ss = SpreadsheetApp.openByUrl(url);
+  var sheet = ss.getSheetByName("DATA");
+  var data = sheet.getDataRange().getValues(); // ดึงข้อมูลทั้งหมดในคราวเดียว
+  var foundUser = 'FALSE';
 
+  for (var i = 1; i < data.length; i++) { // เริ่มที่ index 1 (ข้าม header)
+    var sheetUsername = data[i][0].toString().trim();
+    var sheetPassword = data[i][1].toString().trim();
+    var sheetRole = data[i][10].toString().trim();
 
-    if (!validateEmail(usernamee)) {
-        alert("กรุณากรอกอีเมลที่ถูกต้อง เช่น example@email.com");
-        return false;
-    }
-    var passwordPattern = /^[A-Za-z0-9]{4,}$/; 
-    if (!passwordPattern.test(passwordd)) {
-      alert("รหัสผ่านต้องเป็นตัวอักษรภาษาอังกฤษหรือตัวเลขเท่านั้น!");
-      return false;
-    }
-
-    var thaiPattern = /^[ก-๙]+$/;
-    if (!thaiPattern.test(firstname) || !thaiPattern.test(lastname)) {
-      alert("ชื่อและนามสกุลต้องเป็นภาษาไทยเท่านั้น!");
-      return false;
-    }
-
-    if (usernamee == "" || passwordd == "" || title == "" || firstname == "" || lastname == "" || age == "" || job == "" || income == "" || address == "" || phone == "") {
-      alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
-      return false;
-    } else {
-      google.script.run.withSuccessHandler(function(response) {
-        if (response === 'Username already exists') {
-          alert('ชื่อผู้ใช้ซ้ำ กรุณากรอกใหม่');
-        } else if (response === 'Account created successfully') {
-          alert('บัญชีของคุณถูกสร้างเรียบร้อยแล้ว');
-          document.getElementById("page2_id1").className = "page2_id1-off";
-          document.getElementById("page3_id1").className = "page3_id1";
-        }
-      }).AddRecord(usernamee, passwordd, title, firstname, lastname, age, job, income, address, phone);
+    if (sheetUsername === username && sheetPassword === password) {
+      foundUser = (sheetRole === 'admin') ? 'admin' : 'user';
+      break;
     }
   }
-  function addUserByAdmin() {
-    var username = document.getElementById("admin_username").value;
-    var password = document.getElementById("admin_password").value;
-    var title = document.getElementById("admin_title").value;
-    var firstname = document.getElementById("admin_firstname").value;
-    var lastname = document.getElementById("admin_lastname").value;
-    var age = document.getElementById("admin_age").value;
-    var job = document.getElementById("admin_job").value;
-    var income = document.getElementById("admin_income").value;
-    var address = document.getElementById("admin_address").value;
-    var phone = document.getElementById("admin_phone").value;
-    var role = document.getElementById("admin_role").value; // ดึงค่าบทบาทจาก select
-
-    if (username === "" || password === "" || title === "" || firstname === "" || lastname === "" || age === "" || job === "" || income === "" || address === "" || phone === "" || role === "") {
-        alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
-        return;
-    }
-
-    google.script.run.withSuccessHandler(function(response) {
-        if (response === 'Username already exists') {
-            alert("ชื่อผู้ใช้ซ้ำ กรุณาใช้ชื่ออื่น");
-        } else if (response === 'User added successfully') {
-            alert("เพิ่มผู้ใช้สำเร็จ!");
-            loadAllUsers(); // รีเฟรชตาราง
-        } else {
-            alert("เกิดข้อผิดพลาดในการเพิ่มผู้ใช้");
-        }
-    }).addUserFromAdmin(username, password, title, firstname, lastname, age, job, income, address, phone, role);
+  return foundUser;
 }
 
+// ฟังก์ชันเพิ่มข้อมูลใหม่
+function AddRecord(username, password, title, firstname, lastname, age, job, income, address, phone) {
+  var url = 'https://docs.google.com/spreadsheets/d/1q3a4NVGX-EWTHmxUT-gi9Seyk6AwDJmDkw2jad1xFrY/edit?gid=0#gid=0';
+  var ss = SpreadsheetApp.openByUrl(url);
+  var sheet = ss.getSheetByName("DATA");
 
+  if (checkUsernameExists(username, sheet)) {
+    return 'Username already exists'; // ป้องกันชื่อซ้ำ
+  }
 
+  var hashedPassword = hashPassword(password); // เข้ารหัสรหัสผ่านก่อนเก็บ
 
-
-    function LoginUser() {
-  var username = document.getElementById("username").value.trim();
-  var password = document.getElementById("password").value.trim();
-  
-  console.log("Username:", username);
-  console.log("Password:", password);
-
-  google.script.run.withSuccessHandler(function(output) {
-    console.log("Login Output:", output);
-
-    if (output === 'admin') {
-      document.getElementById("displayadmin").innerHTML = username;
-      document.getElementById("page1_id1").className = "page1_class1-off";
-      document.getElementById("page5_id1").className = "page5_id1";
-      
-      // โหลดข้อมูลผู้ใช้ทั้งหมด
-      loadAllUsers();
-      
-    } else if (output === 'user') {
-      document.getElementById("displayuser").innerHTML = username;
-      document.getElementById("page1_id1").className = "page1_class1-off";
-      document.getElementById("page4_id1").className = "page4_id1";
-      
-    } else {
-      document.getElementById("errorMessage").innerHTML = "Not found account";
-    }
-  }).checkLogin(username, password);
+  sheet.appendRow([username, hashedPassword, title, firstname, lastname, age, job, income, address, phone, 'user']);
+  return 'Account created successfully';
 }
 
-// ฟังก์ชันโหลดข้อมูลทั้งหมดจาก Google Sheets และแสดงในตาราง
-function loadAllUsers() {
-  google.script.run.withSuccessHandler(function(users) {
-    var table = document.getElementById("userTable");
-    var tableBody = document.getElementById("userTableBody");
-    tableBody.innerHTML = ""; // เคลียร์ข้อมูลเก่า
+// ฟังก์ชันตรวจสอบว่ามี username ซ้ำหรือไม่
+function checkUsernameExists(username, sheet) {
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0].toString().trim() === username) {
+      return true;
+    }
+  }
+  return false;
+}
 
-    users.forEach(function(user) {
-      var row = "<tr>" +
-                  "<td>" + user.username + "</td>" +
-                  "<td>" + user.password + "</td>" +
-                  "<td>" + user.title + "</td>" +
-                  "<td>" + user.firstname + "</td>" +
-                  "<td>" + user.lastname + "</td>" +
-                  "<td>" + user.age + "</td>" +
-                  "<td>" + user.job + "</td>" +
-                  "<td>" + user.income + "</td>" +
-                  "<td>" + user.address + "</td>" +
-                  "<td>" + user.phone + "</td>" +
-                  "<td>" + user.role + "</td>" +
-                  "<td>" + user.number + "</td>" +
-                  "<td>" + user.allusere + "</td>" +
-                  "<td>" + user.show + "</td>" +
-                  "<td><button onclick='deleteUser(\"" + user.username + "\")'>ลบ</button></td>" +
-                "</tr>";
-      tableBody.innerHTML += row;
+// ฟังก์ชันเข้ารหัสรหัสผ่าน (ใช้ SHA-256)ทำให้แสดงเป็นรัหสเข้ารัหส
+function hashPassword(password) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password)
+    .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); })
+    .join('');
+}
+function getAllUsers() {
+  var url = 'https://docs.google.com/spreadsheets/d/1q3a4NVGX-EWTHmxUT-gi9Seyk6AwDJmDkw2jad1xFrY/edit?gid=0#gid=0';
+  var ss = SpreadsheetApp.openByUrl(url);
+  var sheet = ss.getSheetByName("DATA");
+  var data = sheet.getDataRange().getValues();
+
+  var users = [];
+  for (var i = 1; i < data.length; i++) {
+    users.push({
+      username: data[i][0],   // Username
+      password: data[i][1],   // Password
+      title: data[i][2],      // คำนำหน้า
+      firstname: data[i][3],  // ชื่อ
+      lastname: data[i][4],   // นามสกุล
+      age: data[i][5],        // อายุ
+      job: data[i][6],        // อาชีพ
+      income: data[i][7],     // รายได้
+      address: data[i][8],    // ที่อยู่
+      phone: data[i][9],      // เบอร์โทร
+      role: data[i][10],       // บทบาท (Admin/User)
+      number: data[i][11],       // บทบาท (Admin/User)
+      allusere: data[i][13],       // บทบาท (Admin/User)
+      show: data[i][15],       // บทบาท (Admin/User)
       
     });
-        
-    table.style.display = "table"; // แสดงตารางเมื่อโหลดข้อมูลเสร็จ
-         // โหลดข้อมูลผู้ใช้ทั้งหมด
-      loadAllUsers();
-  }).getAllUsers();
-    
-}
-
-function toggleTable() {
-  var table = document.getElementById("userTable");
-  if (table.style.display === "none") {
-    table.style.display = "table"; // แสดงตาราง
-  } else {
-    table.style.display = "none"; // ซ่อนตาราง
   }
+  return users;
 }
-
-function deleteUser(username) {
-  var confirmDelete = confirm("คุณแน่ใจหรือไม่ว่าต้องการลบ " + username + " ?");
-  if (confirmDelete) {
-    google.script.run.withSuccessHandler(function(response) {
-      if (response === 'User deleted') {
-        alert("ลบผู้ใช้สำเร็จ!");
-        loadAllUsers(); // โหลดข้อมูลใหม่หลังจากลบ
-      } else {
-        alert("เกิดข้อผิดพลาดในการลบผู้ใช้");
-      }
-    }).deleteUserFromSheet(username);
-  }
-}
-function logoutUser() {
-    // เคลียร์ค่าชื่อผู้ใช้ที่แสดง
-    document.getElementById("displayuser").innerHTML = "";
-    document.getElementById("displayadmin").innerHTML = "";
-
-    // กลับไปหน้า Login
-    document.getElementById("page1_id1").className = "page1_class1";
-    document.getElementById("page4_id1").className = "page4_class1";
-    document.getElementById("page5_id1").className = "page5_class1";
-    
-    // ล้างข้อมูลการล็อกอิน
-    document.getElementById("username").value = "";
-    document.getElementById("password").value = "";
-    document.getElementById("errorMessage").innerHTML = "";
-}
-
-function goBackToLogin() {
-  document.getElementById("page2_id1").className = "page2_id1-off"; // ซ่อนหน้าสมัครสมาชิก
-  document.getElementById("page1_id1").className = "page1_class1";  // แสดงหน้า Login
-}
-
-function addRandomUsers() {
-  var num = document.getElementById("numUsers").value;
-  google.script.run.withSuccessHandler(function(response) {
-  loadAllUsers(); // โหลดข้อมูลใหม่หลังจากลบ
-  document.getElementById("result").innerText = response;
-  }).addRandomUsers(parseInt(num));
-  // โหลดข้อมูลผู้ใช้ทั้งหมด
-  loadAllUsers(); // โหลดข้อมูลใหม่หลังจากลบ
-  loadAllUsers(); // โหลดข้อมูลใหม่หลังจากลบ
-  loadAllUsers(); // โหลดข้อมูลใหม่หลังจากลบ
-  loadAllUsers(); // โหลดข้อมูลใหม่หลังจากลบ
-}   
- function distribute(round) {
-            var job = document.getElementById("job" + round).value;
-            var maxIncome = parseInt(document.getElementById("maxIncome" + round).value);
-            var amount = parseInt(document.getElementById("amount" + round).value);
-
-            google.script.run
-                .withSuccessHandler(response => alert(response))
-                .distributeFunds(round, job, maxIncome, amount);
-        }
-
-        function getStatus() {
-    google.script.run.withSuccessHandler(function(data) {
-        console.log("Data received:", data); // ตรวจสอบค่าที่ได้รับ
-        var table = document.getElementById("statusTable");
-        var tableBody = document.getElementById("statusTableBody");
-        tableBody.innerHTML = ""; // เคลียร์ข้อมูลเก่า
-
-        // ตรวจสอบว่า data เป็น string และต้องแปลงเป็น array
-        var statusList = data.split("\n").slice(1); // แยกบรรทัด และข้ามหัวข้อ "รายชื่อและสถานะ:"
-        
-        if (statusList.length === 0) {
-            console.error("Error: No valid data found");
-            return;
-        }
-
-        statusList.forEach(function(entry) {
-            var parts = entry.split(" - "); // แยกข้อมูลด้วย " - "
-            if (parts.length < 2) return; // ข้ามข้อมูลที่ไม่ครบ
-
-            var row = "<tr>" +
-                        "<td>" + (parts[0] || "ไม่ระบุ") + "</td>" +
-                       
-                        "<td>" + (parts[1] || "ไม่ระบุ") + "</td>" +
-                      "</tr>";
-            tableBody.innerHTML += row;
-        });
-
-        table.style.display = "table"; // แสดงตารางเมื่อโหลดข้อมูลเสร็จ
-    }).getAllStatuses();
-}
-function toggleStatusTable() {
-    var table = document.getElementById("statusTable");
-    if (table.style.display === "none") {
-        table.style.display = "table"; // แสดงตาราง
-    } else {
-        table.style.display = "none"; // ซ่อนตาราง
-    }
-}
-        
-        function getAllStatuses() {
-  checkAndAddColumns();
+function deleteUserFromSheet(username) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("DATA"); 
   var data = sheet.getDataRange().getValues();
-  var columnMap = getColumnMap(data[0]); 
-  var statuses = [];
+  
+  for (var i = 1; i < data.length; i++) { // เริ่มจาก index 1 เพื่อข้ามหัวตาราง
+    if (data[i][0] === username) { // สมมติว่า username อยู่ในคอลัมน์แรก
+      sheet.deleteRow(i + 1); // ลบแถว (บวก 1 เพราะ index เริ่มที่ 1)
+      return "User deleted";
+    }
+  }
+  return "User not found";
+}
+function addUserFromAdmin(username, password, title, firstname, lastname, age, job, income, address, phone, role) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("DATA");
+  var data = sheet.getDataRange().getValues();
+  
+  // ตรวจสอบว่ามี username ซ้ำหรือไม่
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === username) {
+      return "Username already exists";
+    }
+  }
+
+  // เพิ่มข้อมูลผู้ใช้ลงใน Google Sheets พร้อมกับบทบาท (role)
+  sheet.appendRow([username, password, title, firstname, lastname, age, job, income, address, phone, role]);
+  
+  return "User added successfully";
+}
+
+
+function addRandomUsers(num) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("DATA");
+  if (!sheet) {
+    sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet("DATA");
+    sheet.appendRow(["Username", "Password", "Title", "Firstname", "Lastname", "Age", "Job", "Income", "Address", "Phone", "Role"]);
+  }
+
+  var titles = ["นาย", "นาง", "นางสาว"];
+  var firstNames = ["สมชาย", "สมหญิง", "วราภรณ์", "กิตติพงษ์", "ชลธิชา"];
+  var lastNames = ["ใจดี", "บุญมี", "รัตนาวดี", "วงศ์ศรี", "สถาพร"];
+  var occupations = ["นักเรียน", "พนักงานบริษัท", "เกษตรกร", "อื่นๆ", "ฟรีแลนซ์","เจ้าของธุรกิจ"];
+  
+  var data = [];
+  for (var i = 0; i < num; i++) {
+    var username = "user" + Math.floor(10000 + Math.random() * 90000); 
+    var password = hashPassword("password123"); // ใช้รหัสผ่านเริ่มต้นแล้วเข้ารหัส
+    var title = titles[Math.floor(Math.random() * titles.length)];
+    var firstname = firstNames[Math.floor(Math.random() * firstNames.length)];
+    var lastname = lastNames[Math.floor(Math.random() * lastNames.length)];
+    var age = Math.floor(Math.random() * 60) + 18;
+    var job = occupations[Math.floor(Math.random() * occupations.length)];
+    var income = Math.floor(Math.random() * 50000) + 5000;
+    var incomeList = ["ต่ำกว่า 10,000","มากกว่า 50,000","10,000 - 30,000"];
+    var income = incomeList[Math.floor(Math.random() * incomeList.length)];
+    var addressList = ["ชัยนาท","ชลบุรี","ฉะเชิงเทรา","จันทบุรี","ขอนแก่น","กำแพงเพชร","กาฬสินธุ์","กาญจนบุรี","กระบี่ "];
+    var address = addressList[Math.floor(Math.random() * addressList.length)];
+    var phone = "08" + Math.floor(10000000 + Math.random() * 90000000);
+    var role = "user"; 
+
+    data.push([username, password, title, firstname, lastname, age, job, income, address, phone, role]);
+  }
+  //เข้าถึงข้อมูล sheet อ่านและเขียน
+  sheet.getRange(sheet.getLastRow() + 1, 1, data.length, data[0].length).setValues(data);
+  return num + " users added successfully";
+}
+var SHEET_ID = "1q3a4NVGX-EWTHmxUT-gi9Seyk6AwDJmDkw2jad1xFrY";
+var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("DATA");
+
+function parseIncome(incomeStr) {
+  if (typeof incomeStr !== "string") return 0;
+  if (incomeStr.includes("มากกว่า")) return parseInt(incomeStr.replace(/[^0-9]/g, "")) + 1;
+  var match = incomeStr.match(/\d+/g);
+  return match ? parseInt(match[0]) : 0;
+}
+
+function getFundBalance() {
+  return sheet.getRange("O2").getValue();
+}
+
+function setFundBalance(amount) {
+  sheet.getRange("O2").setValue(amount);
+}
+
+function distributeFunds(round, job, maxIncome, perPersonAmount) {
+  var totalFund = getFundBalance();
+  var eligibleRecipients = [];
+  var data = sheet.getDataRange().getValues();
 
   for (var i = 1; i < data.length; i++) {
-    var name = data[i][columnMap["name"]];
-    var status = data[i][columnMap["status"]];
-    statuses.push(`${name}: ${status}`);
+    var personJob = data[i][6]; // คอลัมน์อาชีพ
+    var income = data[i][7] ? parseIncome(data[i][7]) : 0; // คอลัมน์รายได้
+    var status = data[i][17]; // คอลัมน์ status (ตำแหน่งที่ 18)
+
+    if (personJob === job && income <= maxIncome && (status === "" || status === "รอคิว")) {
+      eligibleRecipients.push(i);
+    }
   }
 
-  return statuses.join("\n");
+  if (eligibleRecipients.length === 0) {
+    return `ไม่มีผู้รับสิทธิ์สำหรับอาชีพ ${job} และรายได้ไม่เกิน ${maxIncome} บาท`;
+  }
+
+  var requiredAmount = eligibleRecipients.length * perPersonAmount;
+  if (totalFund < requiredAmount) {
+    perPersonAmount = Math.floor(totalFund / eligibleRecipients.length);
+  }
+
+  var distributedAmount = 0;
+  for (var i = 0; i < eligibleRecipients.length; i++) {
+    if (totalFund >= perPersonAmount) {
+      var rowIndex = eligibleRecipients[i] + 1;
+
+      sheet.getRange(rowIndex, 16).setValue(perPersonAmount); // คอลัมน์ show mony (ตำแหน่งที่ 16)
+      sheet.getRange(rowIndex, 17).setValue(round === 4 ? "ไม่ผ่านเกณฑ์" : "ได้รับเงินแล้ว"); // คอลัมน์ status (ตำแหน่งที่ 19)
+
+      distributedAmount += perPersonAmount;
+      totalFund -= perPersonAmount;
+    }
+  }
+
+  setFundBalance(totalFund);
+  return `แจกเงินรอบที่ ${round} ให้ ${eligibleRecipients.length} คน คนละ ${perPersonAmount} บาท สำเร็จ! คงเหลือเงินกองกลาง ${totalFund} บาท`;
 }
 
- function updateFundBalance() {
-            google.script.run.withSuccessHandler(function(balance) {
-                document.getElementById("fundBalance").innerText = `ยอดเงินกองกลาง: ${balance} บาท`;
-                    
-            }).getFundBalance();
-        }
+function getAllStatuses() {
+  var data = sheet.getDataRange().getValues();
+  var output = "รายชื่อและสถานะ:\n";
 
-        function addFund() {
-            var amount = parseFloat(document.getElementById("fundAmount").value);
-            if (isNaN(amount) || amount <= 0) {
-                alert("กรุณาใส่จำนวนเงินที่ถูกต้อง!");
-                  
-                return;
-            }
-            google.script.run.withSuccessHandler(function(response) {
-                alert(response);
-                updateFundBalance();
-                        
-            }).addFund(amount);
-        }
+  for (var i = 1; i < data.length; i++) {
+    output += `${data[i][0]} - ${data[i][16] || "รอคิว"}\n`; // ชื่อ + สถานะ
+  }
 
-        document.addEventListener("DOMContentLoaded", updateFundBalance);
+  return output;
+}
+function getAllStatuses2() {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("DATA");
+    if (!sheet) return "ERROR: Sheet not found";
 
-function loadUserStatus() {
-    var displayUserElement = document.getElementById("displayuser");
-    if (!displayUserElement) return;
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return "ERROR: No data available";
 
-    var currentUser = displayUserElement.textContent.trim();
-    console.log("✅ Current User:", currentUser);
+    var result = [];
+    for (var i = 1; i < data.length; i++) { 
+        result.push([data[i][0], data[i][16]]); // คอลัมน์ A = index 0, คอลัมน์ Q = index 16
+    }
 
-    google.script.run.withSuccessHandler(function(data) {
-        console.log("📥 Data received:", data);
-
-        if (!Array.isArray(data)) {
-            console.error("❌ Data is not an array:", data);
-            document.getElementById("userStatus").textContent = "เกิดข้อผิดพลาด";
-            return;
-        }
-
-        var userStatus = "ไม่พบข้อมูล";
-        data.forEach(function(entry) {
-            var name = entry[0].trim();  // ชื่อจากคอลัมน์ A
-            var status = entry[1].trim(); // สถานะจากคอลัมน์ Q
-
-            console.log("🔍 Checking:", name, "=", status);
-            if (name.toLowerCase() === currentUser.toLowerCase()) {
-                userStatus = status;
-            }
-        });
-
-        document.getElementById("userStatus").textContent = userStatus;
-    }).getAllStatuses2();
+    return result;
 }
 
-// โหลดข้อมูลเมื่อเข้าสู่หน้า page4
-document.addEventListener("DOMContentLoaded", function() {
-    loadUserStatus();
-});
+function addFund(amount) {
+  if (amount <= 0 || isNaN(amount)) {
+    return "จำนวนเงินต้องมากกว่า 0";
+  }
 
+  var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("DATA");
+  var currentBalance = sheet.getRange("O2").getValue();
+  var newBalance = currentBalance + amount;
 
-function function1(){
-    document.getElementById("page1_id1").className = "page1_class1-off";
-    document.getElementById("page2_id1").className = "page2_id1";
-}
- 
-function function3(){ 
-  document.getElementById("page3_id1").className = "page3_id1-off";
-  document.getElementById("page1_id1").className = "page1_id1"; 
-}
-
-  </script>
-  <style>
-    /*page1*/
-    .page1_class1-off {
-      display: none;
-    }
-
-
-    /*page2*/
-    .page2_class1 {
-      display: none;
-    }
-
-    .page2_id1-off {
-      display: none;
-    }
-
-    /*page3*/
-    .page3_class1 {
-      display: none;
-
-    }
-
-    .page3_id1-off {
-      display: none;
-    }
-
-    /*page4*/
-    .page4_class1 {
-      display: none;
-
-    }
-
-    .page4_id1-off {
-      display: none;
-    }
-
-    .page5_class1 {
-      display: none;
-
-    }
-
-    .page5_id1-off {
-      display: none;
-    }
-
-    input[type=text]:hover {
-      border-bottom: 2px solid black;
-    }
-
-    input[type=number]:hover {
-      border-bottom: 2px solid black;
-    }
-
-    input[type=password]:hover {
-      border-bottom: 2px solid black;
-    }
-
-    .user {
-      display: inline-block;
-      width: 75px;
-      height: 75px;
-      border: 8px solid black;
-      border-radius: 50%;
-      position: relative;
-      overflow: hidden;
-      box-sizing: border-box;
-    }
-
-    /*the head/*/
-    .user::before {
-      content: '';
-      display: inline-block;
-      width: 24px;
-      height: 24px;
-      background: black;
-      border-radius: 50%;
-      position: absolute;
-      left: calc(50% - 11px);
-      top: 10px;
-    }
-
-    /*the body*/
-    .user::after {
-      content: '';
-      display: inline-block;
-      width: 50px;
-      height: 40px;
-      background: black;
-      border-radius: 50%;
-      position: absolute;
-      left: calc(50% - 24px);
-      top: 39px;
-    }
-    
-      body {
+  sheet.getRange("O2").setValue(newBalance);
   
+  return `เพิ่มเงิน ${amount} บาทแล้ว! ยอดเงินคงเหลือ: ${newBalance} บาท`;
 }
-
-@keyframes gradient-shift {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-      .con-nav {
-        background: #333;
-        color: white;
-        padding: 15px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .con-nav a {
-        color: white;
-        text-decoration: none;
-        margin-left: 15px;
-      }
-
-      .container {
-        width: 300px;
-        margin: 50px auto;
-        padding: 20px;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-        text-align: center;
-      }
-
-      h2 {
-        margin-bottom: 100px;
-      }
-
-      .input-group {
-        margin-bottom: 15px;
-        text-align: left;
-      }
-
-      .input-group label {
-        display: block;
-        font-weight: bold;
-        margin-bottom: 5px;
-      }
-
-      .input-group input {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-      }
-
-      .login-btn {
-        width: 100%;
-        padding: 10px;
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 16px;
-        margin-top: 20px;
-      }
-
-      .login-btn:hover {
-        background: #0056b3;
-      }
-
-      .con-btn {
-        display: flex;
-      }
-
-      .con-btn button {
-        margin: 0 10px;
-      }
-
-      input {
-        width: 100%;
-        /* ทำให้ input ขยายเต็มพื้นที่ของ container */
-        padding: 8px;
-        margin-top: 5px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        box-sizing: border-box;
-        /* ป้องกัน input ล้นขอบ */
-      }
-
-      select {
-        width: 100%;
-        /* ทำให้ input ขยายเต็มพื้นที่ของ container */
-        padding: 8px;
-        margin-top: 5px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        box-sizing: border-box;
-        /* ป้องกัน input ล้นขอบ */
-      }
-       .con {
-       width: 400px;
-       padding: 40px;
-       background: linear-gradient(to right, rgb(255, 105, 180), rgb(128, 0, 128));
-       background-size: 200% auto; /* เพิ่มบรรทัดนี้ */
-       animation: gradient-shift 5s linear infinite;
-       border-radius: 10px;
-       text-align: center;
-       color: white;
-       margin: auto;
-       margin-top: 100px;
-       box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
-      }
-        @keyframes gradient-shift {
-        0% {
-        background-position: 0% 50%;
-        }
-        50% {
-        background-position: 100% 50%;
-        }
-        100% {
-        background-position: 0% 50%;
-        }
-        }
-        input {
-            width: 90%;
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 5px;
-            border: none;
-        }
-        input[type="submit"], input[type="button"] {
-            background-color: #28a745;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-            width: 95%;
-        }
-        input[type="submit"]:hover, input[type="button"]:hover {
-            background-color: #218838;
-        }
-        #errorMessage {
-            color: red;
-            font-size: 14px;
-        }.con1 {
-            width: 400px;
-            padding: 30px;
-            background-color: #f8f9fa;
-            border-radius: 10px;
-            text-align: center;
-            color: #333;
-            margin: auto;
-            margin-top: 50px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
-        }
-        input, select {
-            width: 90%;
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-        }
-        input[type="submit"], input[type="button"] {
-            background-color: #28a745;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-            width: 95%;
-        }
-        input[type="submit"]:hover, input[type="button"]:hover {
-            background-color: #218838;
-        }
-        b {
-            color: red;
-            font-size: 14px;
-        }
-        /* สไตล์สำหรับ .con2 */
-.con2 {
-    width: 70%;
-    margin: 0 auto;
-    padding: 20px;
-    background-color: #f4f4f4;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    font-family: Arial, sans-serif;
-}
-
-input, select, button {
-    padding: 8px; /* ลดขนาด padding */
-    margin: 8px 0; /* ลด margin */
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    width: 100%; /* ให้ช่องกรอกข้อมูลเต็มความกว้างของ container */
-    max-width: 400px; /* กำหนดความกว้างสูงสุดไม่เกิน 400px */
-    box-sizing: border-box;
-    font-size: 14px; /* ปรับขนาดฟอนต์ */
-}
-
-button {
-    background-color: #4CAF50;
-    color: white;
-    cursor: pointer;
-    width: auto; /* ปรับปุ่มให้ไม่ยืดเต็ม */
-}
-
-button:hover {
-    background-color: #45a049;
-}
-
-h2, h3 {
-    text-align: center;
-    color: #333;
-}
-
-label {
-    font-weight: bold;
-    font-size: 14px; /* ปรับขนาดฟอนต์ */
-}
-
-/* สไตล์สำหรับตาราง */
-.table-container {
-    display: flex;                /* ใช้ flexbox */
-    justify-content: center;      /* จัดแนวนอน */
-    align-items: center;          /* จัดแนวตั้ง */
-    margin: 20px auto; /* จัดให้อยู่ตรงกลาง */
-    height: 100vh;                /* ทำให้ container ครอบคลุมทั้งความสูงของหน้าจอ */
-    padding: 15px;
-    background-color: #f9f9f9;
-}
-
-table {
-    width: 80%;                   /* กำหนดความกว้างของตาราง */
-    border-collapse: collapse;
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-th, td {
-    padding: 12px;
-    border: 1px solid #ddd;
-    text-align: center;
-    font-size: 14px;
-}
-
-th {
-    background-color: #007bff;
-    color: white;
-    font-weight: bold;
-}
-
-tr:hover {
-    background-color: #f1f1f1;
-}
-
-  </style>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-
-<body>
-  
-  <br><br>
-  <!--page1-->
-  <center>
-    <div class="page1_class1" id="page1_id1">
-       <div class="con">
-        <h1>Login Form</h1>
-        <input type="email" id="username" placeholder="Username" required /><br>
-        <input type="password" id="password" placeholder="Password" required />
-        <br><span id="errorMessage"></span><br>
-        <input type="submit" value="Login" onclick="LoginUser()" /><br>
-        <br>
-        <b>หากยังไม่ได้สมัครสมาชิก</b>
-        <input type="button" onClick="function1()" value="Create New" />
-    </div>
-    </div>
-
-    <!--page2-->
-    <div class="page2_class1" id="page2_id1">
-      <div class="con1">
-      <h1>Create Account</h1>
-      <input type="email" id="usernamee" placeholder="Email" /><br>
-      <br>
-      <input type="password" id="passwordd" placeholder="Create password" /><br>
-      <br>
-      <select id="title" name="title" >
-                        <option value="" disabled selected>คำนำหน้า</option>
-                        <option value="เด็กชาย">เด็กชาย</option>
-                        <option value="เด็กหญิง">เด็กหญิง</option>
-                        <option value="นาย">นาย</option>
-                        <option value="นางสาว">นางสาว</option>
-                        <option value="นาง">นาง</option>
-                    </select>/<br>
-      <br>
-      <input type="text" id="firstname" name="name" placeholder="ชื่อ">/<br>
-      <br>
-      <input type="text" id="lastname" name="lastname" placeholder="นามสกุล">/<br>
-      <br>
-      <input type="number" id="age" name="age" placeholder="อายุ" required>/<br>
-      <br>
-      <select id="job" name="job">
-                        <option value="" disabled selected>อาชีพ</option>
-                        <option value="นักเรียน">นักเรียน</option>
-                        <option value="พนักงานบริษัท">พนักงานบริษัท</option>
-                        <option value="เจ้าของธุรกิจ">เจ้าของธุรกิจ</option>
-                        <option value="ฟรีแลนซ์">ฟรีแลนซ์</option>
-                        <option value="เกษตรกร">เกษตรกร</option>
-                        <option value="อื่นๆ">อื่นๆ</option>
-                    </select>/<br>
-      <br>
-      <select id="income" name="income">
-                        <option value="" disabled selected>รายได้</option>
-                        <option value="ต่ำกว่า 10,000">ต่ำกว่า 10,000</option>
-                        <option value="10,000 - 30,000">10,000 - 30,000</option>
-                        <option value="30,000 - 50,000">30,000 - 50,000</option>
-                        <option value="มากกว่า 50,000">มากกว่า 50,000</option>
-                    </select>/<br>
-      <br>
-      <input type="text" id="address" name="address" placeholder="ที่อยู่" required>/<br>
-      <br>
-      <input type="number" id="phone" placeholder="เบอร์โทร"  /><br><br>
-      <b style="color:red;">รหัสผ่านต้องเป็น a-z หรือ ตัวเลขเท่านั้น</b><br><br>
-      <input type="button" value="ย้อนกลับ" onclick="goBackToLogin()" /> 
-      <input type="submit" value="Create" onclick="AddRow()" />
-      
-    </div>
-    </div>
-
-    <!--page3-->
-    <div class="page3_class1" id="page3_id1">
-      <center>
-        <h2> Your account has been successfully created. Login to your account</h2>
-        <input type="submit"  onClick="function3()" value="Login" ><br>
-    </div>
-
-    <!--page4-->
-    <div class="page4_class1" id="page4_id1">
-      <center>
-        <br>
-        <h2>Hi <b id="displayuser" ></b>!</h2>
-        <div class="user"></div>
-        <h2> You are user</h2>
-        <h2>**************</h2>
-        <!-- หน้า page4 -->
-<div id="page4">
-    
-    <h1>สถานะการได้รับเงิน: <span id="userStatus">กำลังโหลดข้อมูล...</span></h1>
-    <button onclick="loadUserStatus()">รีเฟรชสถานะ</button>
-</div>
-        <input type="button" value="Logout" onclick="logoutUser()" />
-        <br>
-    </div>
-
-   <div class="page5_class1" id="page5_id1">
-     <div class="con2">
-    <center>
-        <br>
-        <input type="button" value="Logout" onclick="logoutUser()" />
-        <h2>Hi <b id="displayadmin"></b>!</h2>
-        <div class="user"></div>
-        <h2>You are admin</h2>
-        <h2>**************</h2>
-        <!-- ฟอร์มเพิ่มข้อมูลผู้ใช้ -->
-        <h3>เพิ่มข้อมูลผู้ใช้</h3>
-        <input type="email" id="admin_username" placeholder="Email"/><br><br>
-        <input type="password" id="admin_password" placeholder="Password"/><br><br>
-        <select id="admin_title">
-          <option value="" disabled selected>คำนำหน้า</option>
-          <option value="นาย">นาย</option>
-          <option value="นางสาว">นางสาว</option>
-          <option value="นาง">นาง</option>
-        </select><br><br>
-        <input type="text" id="admin_firstname" placeholder="ชื่อ"/><br><br>
-        <input type="text" id="admin_lastname" placeholder="นามสกุล"/><br><br>
-        <input type="number" id="admin_age" placeholder="อายุ"/><br><br>
-        <input type="text" id="admin_job" placeholder="อาชีพ"/><br><br>
-        <input type="text" id="admin_income" placeholder="รายได้"/><br><br>
-        <input type="text" id="admin_address" placeholder="ที่อยู่"/><br><br>
-        <input type="text" id="admin_phone" placeholder="เบอร์โทร"/><br><br>
-        <select id="admin_role">
-          <option value="" disabled selected>เลือกบทบาท</option>
-          <option value="user">User</option>
-          <option value="admin">Admin</option>
-        </select><br><br>
-        <button onclick="addUserByAdmin()">เพิ่มผู้ใช้</button>
-        
-        <br><br>
-      
-          <!-- ปุ่มโหลดข้อมูล -->
-<button onclick="loadAllUsers()">โหลดข้อมูลผู้ใช้</button>
-<!-- ปุ่มซ่อน/แสดงตาราง -->
-<button onclick="toggleTable()">ซ่อน/แสดงตาราง</button>
-
-<!-- ตารางซ่อนอยู่ก่อน -->
-<table id="userTable" border="1" style="display: none;">
-    <thead>
-        <tr>
-            <th>Username</th>
-            <th>Password</th>
-            <th>Title</th>
-            <th>Firstname</th>
-            <th>Lastname</th>
-            <th>Age</th>
-            <th>Job</th>
-            <th>Income</th>
-            <th>Address</th>
-            <th>Phone</th>
-            <th>Role</th>
-            <th>Number</th>
-            <th>All User</th>
-            <th>Show</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody id="userTableBody">
-        <!-- ข้อมูลผู้ใช้จะแสดงที่นี่ผ่าน JavaScript -->
-    </tbody>
-</table>
-        <h2>เพิ่มผู้ใช้แบบสุ่ม</h2>
-    <label for="numUsers">เลือกจำนวนผู้ใช้:</label>
-    <select id="numUsers">
-        <option value="10">10 คน</option>
-        <option value="100">100 คน</option>
-        <option value="500">500 คน</option>
-        <option value="1000">1,000 คน</option>
-    </select>
-    <button onclick="addRandomUsers()">เพิ่มผู้ใช้</button>
-    <p id="result"></p>
-    <h2>เพิ่มเงินเข้ากองทุน</h2>
-    
-    <h3 id="fundBalance">กำลังโหลด...</h3>
-
-    <input type="number" id="fundAmount" placeholder="จำนวนเงิน (บาท)">
-    <button onclick="addFund()">เพิ่มเงิน</button>
-   <h2>ระบบแจกเงิน 3 รอบ</h2>
-    <div>
-        <h4>รอบที่ 1</h4>
-        <label>อาชีพ: 
-            <select id="job1">
-                <option value="นักเรียน">นักเรียน</option>
-                <option value="นักศึกษา">นักศึกษา</option>
-                <option value="พนักงานบริษัท">พนักงานบริษัท</option>
-                <option value="ข้าราชการ">ข้าราชการ</option>
-                <option value="เกษตรกร">เกษตรกร</option>
-            </select>
-        </label><br>
-        <label>รายได้ไม่เกิน: 
-            <select id="maxIncome1">
-                <option value="10000">ไม่เกิน 10,000</option>
-                <option value="30000">ไม่เกิน 30,000</option>
-                <option value="50000">ไม่เกิน 50,000</option>
-                <option value="9999999">มากกว่า 50,000</option>
-            </select>
-        </label><br>
-        <label>จำนวนเงินต่อคน: <input type="number" id="amount1"></label><br>
-        <button onclick="distribute(1)">แจกครั้งที่ 1</button>
-    </div>
-
-    <div>
-        <h4>รอบที่ 2</h4>
-        <label>อาชีพ: 
-            <select id="job2">
-                <option value="นักเรียน">นักเรียน</option>
-                <option value="นักศึกษา">นักศึกษา</option>
-                <option value="พนักงานบริษัท">พนักงานบริษัท</option>
-                <option value="ข้าราชการ">ข้าราชการ</option>
-                <option value="เกษตรกร">เกษตรกร</option>
-            </select>
-        </label><br>
-        <label>รายได้ไม่เกิน: 
-            <select id="maxIncome2">
-                <option value="10000">ไม่เกิน 10,000</option>
-                <option value="30000">ไม่เกิน 30,000</option>
-                <option value="50000">ไม่เกิน 50,000</option>
-                <option value="9999999">มากกว่า 50,000</option>
-            </select>
-        </label><br>
-        <label>จำนวนเงินต่อคน: <input type="number" id="amount2"></label><br>
-        <button onclick="distribute(2)">แจกครั้งที่ 2</button>
-    </div>
-
-    <div>
-        <h4>รอบที่ 3</h4>
-        <label>อาชีพ: 
-            <select id="job3">
-                <option value="นักเรียน">นักเรียน</option>
-                <option value="นักศึกษา">นักศึกษา</option>
-                <option value="พนักงานบริษัท">พนักงานบริษัท</option>
-                <option value="ข้าราชการ">ข้าราชการ</option>
-                <option value="เกษตรกร">เกษตรกร</option>
-            </select>
-        </label><br>
-        <label>รายได้ไม่เกิน: 
-            <select id="maxIncome3">
-                <option value="10000">ไม่เกิน 10,000</option>
-                <option value="30000">ไม่เกิน 30,000</option>
-                <option value="50000">ไม่เกิน 50,000</option>
-                <option value="9999999">มากกว่า 50,000</option>
-            </select>
-        </label><br>
-        <label>จำนวนเงินต่อคน: <input type="number" id="amount3"></label><br>
-        <button onclick="distribute(3)">แจกครั้งที่ 3</button>
-    </div>
-
-    <h3>สถานะของผู้รับเงิน</h3>
-
-<!-- ปุ่มโหลดสถานะ -->
-<button onclick="getStatus()">ดูสถานะ</button>
-<!-- ปุ่มเปิด/ปิดตาราง -->
-<button onclick="toggleStatusTable()">ซ่อน/แสดงตาราง</button>
-
-<!-- ตารางซ่อนอยู่ก่อน -->
-<table id="statusTable" border="1" style="display: none; margin-top: 10px;">
-    <thead>
-        <tr>
-            <th>ชื่อ</th>
-      
-            <th>สถานะ</th>
-        </tr>
-    </thead>
-    <tbody id="statusTableBody">
-        <!-- ข้อมูลสถานะจะแสดงที่นี่ผ่าน JavaScript -->
-    </tbody>
-</table>
-    </center>
-  </div>
-  </center>
-</div>
-</div>
-
-</body>
-
-
-</html>
